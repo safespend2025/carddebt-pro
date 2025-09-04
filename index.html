@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CardDebt Pro</title>
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0b5cff">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <style>
@@ -30,8 +30,6 @@
     input,select{font-size:15px;padding:10px;border-radius:10px;border:1px solid var(--line);width:100%}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
     .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);}
-    .progress{height:10px;background:#e9ecf6;border-radius:999px;overflow:hidden}
-    .progress>div{height:100%;background:var(--accent);width:0%}
     .right{margin-left:auto}
     dialog{border:none;border-radius:16px;max-width:620px;width:92%;padding:0}
     dialog .content{padding:16px}
@@ -91,8 +89,6 @@
     </section>
   </main>
 
-  <div class="toast" id="toast">Actualizando…</div>
-
   <dialog id="dlgCard">
     <header><strong id="dlgCardTitle">Tarjeta</strong></header>
     <div class="content row">
@@ -140,6 +136,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

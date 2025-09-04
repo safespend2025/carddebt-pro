@@ -1,8 +1,8 @@
-// Auto-updating Service Worker for CardDebt Pro v2
-const CACHE = 'carddebt-pro-v20250904032426';
+// SW (relative-safe) for CardDebt Pro
+const CACHE = 'carddebt-pro-fixed-v20250904042014';
 const ASSETS = [
-  '/', '/index.html', '/app.js', '/manifest.json',
-  '/icons/icon-192.png', '/icons/icon-512.png'
+  './', './index.html', './app.js', './manifest.json',
+  './icons/icon-192.png', './icons/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -23,11 +23,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
-    return;
-  }
-  if (ASSETS.includes(url.pathname)) {
-    event.respondWith(caches.match(req).then(cached => cached || fetch(req)));
+    event.respondWith(fetch(req).catch(() => caches.match('./index.html')));
     return;
   }
   event.respondWith(caches.match(req).then(cached => cached || fetch(req)));

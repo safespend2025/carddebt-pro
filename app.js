@@ -1,4 +1,4 @@
-// CardDebt Pro v2 – dynamic interest preview, edit/delete txns, compounding monthly
+// CardDebt Pro (fixed paths) – dynamic interest preview, edit/delete txns, compounding monthly
 const $ = (s)=>document.querySelector(s);
 const fmt = (n)=> (Number(n)||0).toLocaleString('en-US',{style:'currency',currency:'USD'});
 const load = ()=> JSON.parse(localStorage.getItem('cc:debt:data')||'{"cards":[],"history":[]}');
@@ -12,7 +12,14 @@ function initTheme(){
   if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   localStorage.setItem(THEME_KEY, t); applyTheme(t);
 }
-$("#btnTheme").addEventListener('click', ()=>{ const t=localStorage.getItem(THEME_KEY)||'light'; const n=(t==='dark'?'light':'dark'); localStorage.setItem(THEME_KEY,n); applyTheme(n); });
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('btnTheme');
+  if (btn) btn.addEventListener('click', ()=>{
+    const t=localStorage.getItem(THEME_KEY)||'light';
+    const n=(t==='dark'?'light':'dark');
+    localStorage.setItem(THEME_KEY,n); applyTheme(n);
+  });
+});
 initTheme();
 
 let data = load();
@@ -40,7 +47,7 @@ function computeTotals(){
   return {debt, interest};
 }
 
-// Interest posting: once per cycle, uses CURRENT debt & APR at the moment of posting
+// Interest posting: once per cycle, uses CURRENT debt & APR at posting time
 function applyInterestIfDue(){
   const today = new Date();
   const isoMonth = today.toISOString().slice(0,7); // YYYY-MM
@@ -52,7 +59,7 @@ function applyInterestIfDue(){
     const key = `${isoMonth}-${c.id}`;
     data.interestApplied = data.interestApplied || [];
     if (isTodayBilling && !data.interestApplied.includes(key)){
-      const amount = monthlyInterest(c.debt, c.apr); // dynamic: reflects current debt/APR
+      const amount = monthlyInterest(c.debt, c.apr); // dynamic
       c.debt = Math.max(0, Number(c.debt||0) + amount);
       data.history.push({id: crypto.randomUUID(), type:'interest', cardId:c.id, amount, desc:`Interés ${c.apr}%`, date:new Date().toISOString()});
       data.interestApplied.push(key);
@@ -64,17 +71,17 @@ function applyInterestIfDue(){
 function render(){
   applyInterestIfDue();
 
-  const viewResumen = $("#viewResumen");
-  const viewTarjetas = $("#viewTarjetas");
+  const viewResumen = document.getElementById('viewResumen');
+  const viewTarjetas = document.getElementById('viewTarjetas');
   const activeTab = localStorage.getItem('cc:tab') || 'resumen';
   viewResumen.classList.toggle('hidden', activeTab!=='resumen');
   viewTarjetas.classList.toggle('hidden', activeTab!=='tarjetas');
 
   const t = computeTotals();
-  $("#sumDebt").textContent = fmt(t.debt);
-  $("#sumInterest").textContent = fmt(t.interest);
+  document.getElementById('sumDebt').textContent = fmt(t.debt);
+  document.getElementById('sumInterest').textContent = fmt(t.interest);
 
-  const hist = $("#historyList"); hist.innerHTML = "";
+  const hist = document.getElementById('historyList'); hist.innerHTML = "";
   data.history.slice(-10).reverse().forEach(h=>{
     const row = document.createElement('div');
     row.className='row';
@@ -83,7 +90,7 @@ function render(){
     hist.appendChild(row);
   });
 
-  const wrap = $("#cards"); wrap.innerHTML='';
+  const wrap = document.getElementById('cards'); wrap.innerHTML='';
   sortCards(data.cards).forEach(c=>{
     const nd = nextDueDate(c.dueDay); const d = daysUntil(nd);
     const overdue = d<0;
@@ -115,7 +122,6 @@ function render(){
     `;
     wrap.appendChild(container);
 
-    // Render ALL txns for this card (most recent first)
     const list = container.querySelector(`#txns-${c.id}`);
     data.history.filter(h=>h.cardId===c.id).slice().reverse().forEach(h=>{
       const row = document.createElement('div');
@@ -160,13 +166,13 @@ function deleteCard(id){
   save(data); render();
 }
 
-// Transaction helpers
+// Txn helpers
 function applyTxnEffect(c, type, amount){
-  if (type==='expense' or type==='interest'){ c.debt = Math.max(0, Number(c.debt||0) + amount); }
+  if (type==='expense' || type==='interest'){ c.debt = Math.max(0, Number(c.debt||0) + amount); }
   else if (type==='payment'){ c.debt = Math.max(0, Number(c.debt||0) - amount); }
 }
 function reverseTxnEffect(c, type, amount){
-  if (type==='expense' or type==='interest'){ c.debt = Math.max(0, Number(c.debt||0) - amount); }
+  if (type==='expense' || type==='interest'){ c.debt = Math.max(0, Number(c.debt||0) - amount); }
   else if (type==='payment'){ c.debt = Math.max(0, Number(c.debt||0) + amount); }
 }
 
@@ -179,21 +185,17 @@ function addTxn(cardId, type, amount, desc){
   save(data); render();
 }
 
-// Edit txn (cannot change interest type entries to keep history integrity, but we allow delete interest)
+// Edit / delete txn
 function editTxn(txnId, newType, newAmount, newDesc){
   const h = data.history.find(x=>x.id===txnId); if(!h) return;
   const c = data.cards.find(x=>x.id===h.cardId); if(!c) return;
-  // Reverse old effect
   reverseTxnEffect(c, h.type, Number(h.amount||0));
-  // If original was interest, forbid changing type (keep as interest) for clarity
   const typeToApply = (h.type==='interest') ? 'interest' : newType;
   const amountToApply = Number(newAmount||0);
   applyTxnEffect(c, typeToApply, amountToApply);
   h.type = typeToApply; h.amount = amountToApply; h.desc = newDesc; h.date = new Date().toISOString();
   save(data); render();
 }
-
-// Delete txn
 function deleteTxn(txnId){
   const idx = data.history.findIndex(x=>x.id===txnId); if(idx<0) return;
   const h = data.history[idx];
@@ -204,80 +206,79 @@ function deleteTxn(txnId){
 }
 
 // UI events
-$("#btnAddCard").addEventListener('click', ()=>{
-  $("#dlgCardTitle").textContent = "Añadir tarjeta";
-  $("#cardName").value = "";
-  $("#cardDebt").value = "";
-  $("#cardAPR").value = "";
-  $("#cardDueDay").value = "";
+document.getElementById('btnAddCard').addEventListener('click', ()=>{
+  document.getElementById('dlgCardTitle').textContent = "Añadir tarjeta";
+  document.getElementById('cardName').value = "";
+  document.getElementById('cardDebt').value = "";
+  document.getElementById('cardAPR').value = "";
+  document.getElementById('cardDueDay').value = "";
   window.editingCardId = null;
-  $("#dlgCard").showModal();
+  document.getElementById('dlgCard').showModal();
 });
-$("#cancelCard").addEventListener('click', ()=> $("#dlgCard").close());
+document.getElementById('cancelCard').addEventListener('click', ()=> document.getElementById('dlgCard').close());
 document.getElementById('saveCard').onclick = ()=>{
-  const name=$("#cardName").value.trim();
-  const debt=$("#cardDebt").value.trim();
-  const apr=$("#cardAPR").value.trim();
-  const due=$("#cardDueDay").value.trim();
+  const name=document.getElementById('cardName').value.trim();
+  const debt=document.getElementById('cardDebt').value.trim();
+  const apr=document.getElementById('cardAPR').value.trim();
+  const due=document.getElementById('cardDueDay').value.trim();
   if(!name) return alert("Pon el nombre de la tarjeta");
   if (window.editingCardId) updateCard(window.editingCardId, name, debt, apr, due);
   else addCard(name, debt, apr, due);
-  $("#dlgCard").close();
+  document.getElementById('dlgCard').close();
 };
 
-// Cards actions
-$("#cards").addEventListener('click', (e)=>{
+document.getElementById('cards').addEventListener('click', (e)=>{
   const btn = e.target.closest('button'); if(!btn) return;
   const id = btn.dataset.id; const act = btn.dataset.act;
   if (act==='edit'){
     const c = data.cards.find(x=>x.id===id); if(!c) return;
     window.editingCardId = id;
-    $("#dlgCardTitle").textContent = "Editar tarjeta";
-    $("#cardName").value = c.name;
-    $("#cardDebt").value = c.debt;
-    $("#cardAPR").value = c.apr;
-    $("#cardDueDay").value = c.dueDay || "";
-    $("#dlgCard").showModal();
+    document.getElementById('dlgCardTitle').textContent = "Editar tarjeta";
+    document.getElementById('cardName').value = c.name;
+    document.getElementById('cardDebt').value = c.debt;
+    document.getElementById('cardAPR').value = c.apr;
+    document.getElementById('cardDueDay').value = c.dueDay || "";
+    document.getElementById('dlgCard').showModal();
   } else if (act==='delete'){
     deleteCard(id);
   } else if (act==='txn'){
     window.currentTxnCardId = id;
-    $("#dlgTxnTitle").textContent = "Añadir movimiento";
-    $("#txnType").value = "expense";
-    $("#txnAmount").value = "";
-    $("#txnDesc").value = "";
-    $("#dlgTxn").showModal();
+    document.getElementById('dlgTxnTitle').textContent = "Añadir movimiento";
+    document.getElementById('txnType').value = "expense";
+    document.getElementById('txnAmount').value = "";
+    document.getElementById('txnDesc').value = "";
+    document.getElementById('dlgTxn').showModal();
   } else if (e.target.dataset.tact==='edit-txn'){
     const txnId = e.target.dataset.id; editingTxnId = txnId;
     const h = data.history.find(x=>x.id===txnId); if(!h) return;
-    $("#editTxnType").value = (h.type==='interest') ? 'expense' : h.type; // interest cannot change type; we'll ignore change
-    $("#editTxnAmount").value = h.amount;
-    $("#editTxnDesc").value = h.desc || '';
-    $("#dlgTxnEdit").showModal();
+    document.getElementById('editTxnType').value = (h.type==='interest') ? 'expense' : h.type;
+    document.getElementById('editTxnAmount').value = h.amount;
+    document.getElementById('editTxnDesc').value = h.desc || '';
+    document.getElementById('dlgTxnEdit').showModal();
   } else if (e.target.dataset.tact==='del-txn'){
     const txnId = e.target.dataset.id;
     if (confirm('¿Borrar este movimiento?')) deleteTxn(txnId);
   }
 });
 
-document.getElementById('cancelTxn').onclick = ()=> $("#dlgTxn").close();
+document.getElementById('cancelTxn').onclick = ()=> document.getElementById('dlgTxn').close();
 document.getElementById('saveTxn').onclick = ()=>{
-  const type = $("#txnType").value;
-  const amount = $("#txnAmount").value.trim();
-  const desc = $("#txnDesc").value.trim();
+  const type = document.getElementById('txnType').value;
+  const amount = document.getElementById('txnAmount').value.trim();
+  const desc = document.getElementById('txnDesc').value.trim();
   if(!amount) return alert("Escribe un monto");
   addTxn(window.currentTxnCardId, type, amount, desc);
-  $("#dlgTxn").close();
+  document.getElementById('dlgTxn').close();
 };
 
-document.getElementById('cancelEditTxn').onclick = ()=> $("#dlgTxnEdit").close();
+document.getElementById('cancelEditTxn').onclick = ()=> document.getElementById('dlgTxnEdit').close();
 document.getElementById('updateTxn').onclick = ()=>{
-  if(!editingTxnId) return $("#dlgTxnEdit").close();
-  const t = $("#editTxnType").value;
-  const a = $("#editTxnAmount").value.trim();
-  const d = $("#editTxnDesc").value.trim();
+  if(!editingTxnId) return document.getElementById('dlgTxnEdit').close();
+  const t = document.getElementById('editTxnType').value;
+  const a = document.getElementById('editTxnAmount').value.trim();
+  const d = document.getElementById('editTxnDesc').value.trim();
   editTxn(editingTxnId, t, a, d);
-  $("#dlgTxnEdit").close();
+  document.getElementById('dlgTxnEdit').close();
 };
 
 // Tabs
@@ -285,18 +286,15 @@ function setTab(t){ localStorage.setItem('cc:tab', t); render(); }
 document.getElementById('tabResumen').onclick = ()=> setTab('resumen');
 document.getElementById('tabTarjetas').onclick = ()=> setTab('tarjetas');
 
-// SW auto-update
+// SW auto-update (relative path)
 if ('serviceWorker' in navigator){
   window.addEventListener('load', async () => {
     try{
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      function refreshOnUpdate(){
-        if (reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
-      }
+      const reg = await navigator.serviceWorker.register('./sw.js');
       reg.addEventListener('updatefound', ()=>{
         const sw = reg.installing;
         sw && sw.addEventListener('statechange', ()=>{
-          if (sw.state==='installed' && navigator.serviceWorker.controller) refreshOnUpdate();
+          if (sw.state==='installed' && navigator.serviceWorker.controller) reg.waiting && reg.waiting.postMessage({type:'SKIP_WAITING'});
         });
       });
       navigator.serviceWorker.addEventListener('controllerchange', ()=> window.location.reload());
